@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Mail, MapPin, Phone } from "lucide-react";
 import { ABOUT, BRAND, EXPERIENCES, YACHTS, type YachtId } from "@/data/site";
+import { scrollToTarget } from "@/lib/scroll";
 
 /* ---------------------------------------------------------------- fleet */
 
@@ -18,7 +19,7 @@ export function Fleet({ onOpen }: { onOpen: (id: YachtId) => void }) {
             </h2>
           </div>
           <p data-reveal style={{ ["--d" as string]: "0.1s" }} className="max-w-md text-[15px] leading-relaxed text-white/70">
-            Four handpicked yachts for every occasion. Choose one to see what is on board and make an enquiry.
+            Four handpicked yachts for every occasion. Choose one to step inside, see what is on board and enquire.
           </p>
         </header>
 
@@ -53,7 +54,7 @@ export function Fleet({ onOpen }: { onOpen: (id: YachtId) => void }) {
                 </div>
                 <div className="flex items-center justify-between border-t border-white/10 px-5 py-4 font-mono text-[10px] tracking-[0.25em] text-white/60">
                   <span>{y.short.toUpperCase()}</span>
-                  <span className="text-[var(--accent)]">VIEW</span>
+                  <span className="text-[var(--accent)]">ENQUIRE</span>
                 </div>
               </button>
             </li>
@@ -68,19 +69,19 @@ export function Fleet({ onOpen }: { onOpen: (id: YachtId) => void }) {
 
 export function Experiences() {
   return (
-    <section id="experiences" className="relative bg-[var(--bg2)] px-5 py-24 sm:px-10 md:px-[6vw] md:py-36" aria-labelledby="experiences-h">
+    <section id="experiences" className="relative bg-[var(--bg2)] px-5 py-24 sm:px-10 md:px-[6vw] md:py-36" aria-labelledby="exp-h">
       <div className="mx-auto max-w-[1500px]">
         <div data-reveal>
-          <p className="font-mono text-[10px] tracking-[0.4em] text-[var(--accent)]">CHARTER EXPERIENCES</p>
-          <h2 id="experiences-h" className="mt-5 font-serif text-[13vw] leading-[0.92] tracking-[-0.02em] sm:text-[8vw] md:text-[5.6vw]">
-            Tailored to <em className="italic text-[var(--accent)]">your occasion.</em>
+          <p className="font-mono text-[10px] tracking-[0.4em] text-[var(--accent)]">EXPERIENCES &amp; CHARTERS</p>
+          <h2 id="exp-h" className="mt-5 font-serif text-[13vw] leading-[0.92] tracking-[-0.02em] sm:text-[8vw] md:text-[5.6vw]">
+            Tailored to <em className="italic text-[var(--accent)]">you.</em>
           </h2>
         </div>
-        <ul className="mt-14 grid gap-5 md:grid-cols-2">
+        <ul className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {EXPERIENCES.map((exp, i) => (
-            <li key={exp.id} data-reveal style={{ ["--d" as string]: `${(i % 2) * 0.08}s` }}>
-              <article className="group grid overflow-hidden rounded-sm border border-white/10 bg-white/[0.02] sm:grid-cols-[1fr_1.1fr]">
-                <div className="relative aspect-[16/10] overflow-hidden sm:aspect-auto sm:min-h-[260px]">
+            <li key={exp.id} data-reveal style={{ ["--d" as string]: `${(i % 3) * 0.08}s` }}>
+              <article className="group flex h-full flex-col overflow-hidden rounded-sm border border-white/10 bg-white/[0.02]">
+                <div className="relative aspect-[16/10] overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={exp.image}
@@ -90,10 +91,16 @@ export function Experiences() {
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-[1.04]"
                   />
                 </div>
-                <div className="flex flex-col p-6 md:p-7">
-                  <h3 className="font-serif text-3xl leading-[1.05]">{exp.title}</h3>
-                  <p className="mt-2 font-serif text-lg italic text-[var(--accent)]">{exp.tagline}</p>
+                <div className="flex flex-1 flex-col p-6 md:p-7">
+                  <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--accent)]">{exp.tagline.toUpperCase()}</p>
+                  <h3 className="mt-3 font-serif text-3xl leading-[1.05]">{exp.title}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-white/65">{exp.description}</p>
+                  <button
+                    onClick={() => scrollToTarget("#contact")}
+                    className="btn-ghost mt-auto self-start !mt-7"
+                  >
+                    Enquire <ArrowUpRight size={14} />
+                  </button>
                 </div>
               </article>
             </li>
@@ -133,13 +140,7 @@ export function About() {
         </div>
         <div data-reveal className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="img/about-fleet.webp"
-            alt="The Dubriani fleet at anchor in the Arabian Gulf"
-            loading="lazy"
-            decoding="async"
-            className="aspect-[4/5] w-full rounded-sm object-cover object-[48%_60%] md:aspect-[5/6]"
-          />
+          <img src="img/about-fleet.webp" alt="Dubriani yachts in Dubai Marina" loading="lazy" decoding="async" className="aspect-[4/5] w-full rounded-sm object-cover md:aspect-[5/6]" />
           <p className="absolute bottom-4 left-4 font-mono text-[10px] tracking-[0.3em] text-white/80">THE FLEET · DUBAI MARINA</p>
         </div>
       </div>
@@ -154,13 +155,13 @@ export function Contact() {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    const body = `Name: ${f.get("name")}\nEmail: ${f.get("email")}\nPreferred yacht: ${f.get("yacht")}\nPreferred date: ${f.get("date")}\nGuests: ${f.get("guests")}\n\n${f.get("message")}`;
+    const body = `Name: ${f.get("name")}\nEmail: ${f.get("email")}\nYacht: ${f.get("yacht")}\nPreferred date: ${f.get("date")}\nGuests: ${f.get("guests")}\n\n${f.get("message")}`;
     setSent(true);
     window.location.href = `mailto:${BRAND.contactEmail}?subject=${encodeURIComponent("Charter enquiry")}&body=${encodeURIComponent(body)}`;
   };
 
   return (
-    <footer id="contact" className="relative bg-[#030811] text-[var(--cream)]" aria-labelledby="contact-h">
+    <footer id="contact" className="relative bg-[#030308] text-[var(--cream)]" aria-labelledby="contact-h">
       <div className="mx-auto grid max-w-[1500px] gap-14 px-5 py-24 sm:px-10 md:grid-cols-2 md:px-[6vw] md:py-36">
         <div>
           <p data-reveal className="font-mono text-[10px] tracking-[0.4em] text-[var(--accent)]">CONTACT · CHARTER ENQUIRIES</p>
@@ -172,15 +173,21 @@ export function Contact() {
           <dl data-reveal className="mt-10 space-y-5 text-sm">
             <div>
               <dt className="label">Email</dt>
-              <dd className="mt-1 font-serif text-2xl">{BRAND.contactEmail}</dd>
+              <dd className="mt-1 flex items-center gap-2 font-serif text-2xl">
+                <Mail size={18} className="text-[var(--accent)]" /> {BRAND.contactEmail}
+              </dd>
             </div>
             <div>
               <dt className="label">Phone</dt>
-              <dd className="mt-1 font-serif text-2xl">{BRAND.contactPhone}</dd>
+              <dd className="mt-1 flex items-center gap-2 font-serif text-2xl">
+                <Phone size={18} className="text-[var(--accent)]" /> {BRAND.contactPhone}
+              </dd>
             </div>
             <div>
               <dt className="label">Base</dt>
-              <dd className="mt-1 font-serif text-2xl">{BRAND.base}</dd>
+              <dd className="mt-1 flex items-center gap-2 font-serif text-2xl">
+                <MapPin size={18} className="text-[var(--accent)]" /> {BRAND.base}
+              </dd>
             </div>
           </dl>
         </div>
@@ -197,7 +204,7 @@ export function Contact() {
           </div>
           <div className="grid gap-6 sm:grid-cols-2">
             <label className="block">
-              <span className="label">Preferred yacht</span>
+              <span className="label">Yacht interest</span>
               <select name="yacht" className="field">
                 <option value="">Any yacht</option>
                 {YACHTS.map((y) => (
@@ -212,12 +219,14 @@ export function Contact() {
               <input name="date" type="date" className="field" />
             </label>
           </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <label className="block">
+              <span className="label">Guests</span>
+              <input name="guests" inputMode="numeric" placeholder="e.g. 20" className="field" />
+            </label>
+          </div>
           <label className="block">
-            <span className="label">Number of guests</span>
-            <input name="guests" inputMode="numeric" placeholder="e.g. 20" className="field" />
-          </label>
-          <label className="block">
-            <span className="label">Tell us about your event</span>
+            <span className="label">Tell us about the charter</span>
             <textarea name="message" rows={3} className="field resize-none" />
           </label>
           <div className="flex flex-wrap items-center gap-5">
@@ -231,7 +240,7 @@ export function Contact() {
         </form>
       </div>
       <div className="border-t border-white/10 px-5 py-6 font-mono text-[10px] tracking-[0.25em] text-white/40 sm:px-10 md:px-[6vw]">
-        © {new Date().getFullYear()} {BRAND.name} — {BRAND.tag.toUpperCase()}
+        © 2026 {BRAND.name} — {BRAND.tag.toUpperCase()}
       </div>
     </footer>
   );
