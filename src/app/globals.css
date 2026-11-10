@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-serif: var(--font-serif-src), Georgia, serif;
-  --font-sans: var(--font-sans-src), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-src), ui-monospace, monospace;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 :root {
@@ -21,7 +21,7 @@ html {
 body {
   background: var(--bg);
   color: var(--cream);
-  font-family: var(--font-sans-src), ui-sans-serif, system-ui, sans-serif;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
 }
 ::selection {
