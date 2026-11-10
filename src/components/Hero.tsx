@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import { ArrowDown } from "lucide-react";
-import { BRAND } from "@/data/site";
+import { BRAND, type YachtId } from "@/data/site";
 import { loadState } from "@/lib/loadstate";
 import { onScroll, scrollToTarget, startScroll } from "@/lib/scroll";
 
@@ -23,7 +23,7 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-function Hero() {
+function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => void }) {
   const wrapRef = useRef<HTMLElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const overlayRefs = useRef<{
