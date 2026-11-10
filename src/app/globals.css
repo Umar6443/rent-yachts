@@ -1,1 +1,148 @@
 @import "tailwindcss";
+
+@theme inline {
+  --font-serif: var(--font-serif-src), Georgia, serif;
+  --font-sans: var(--font-sans-src), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-src), ui-monospace, monospace;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --cream: #f5f0e8;
+  --accent: #c9a96e;
+  --accent2: #1a3a5c;
+}
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+}
+body {
+  background: var(--bg);
+  color: var(--cream);
+  font-family: var(--font-sans-src), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
+}
+::selection {
+  background: var(--accent);
+  color: #0a0a0f;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-[var(--accent)] bg-[var(--accent)] px-7 py-4 font-mono text-[11px] font-medium tracking-[0.25em] uppercase transition-[background-color,color,transform] duration-300;
+    color: #0a0a0f;
+  }
+  .btn:hover {
+    background: transparent;
+    color: var(--accent);
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3.5 font-mono text-[11px] tracking-[0.25em] text-white/90 uppercase transition-colors duration-300;
+  }
+  .btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .field {
+    @apply mt-2 block w-full rounded-none border-0 border-b border-white/25 bg-transparent py-3 text-lg text-[var(--cream)] outline-none transition-colors;
+  }
+  .field:focus {
+    border-color: var(--accent);
+  }
+  .field option {
+    background: #111118;
+  }
+  .label {
+    @apply font-mono text-[10px] tracking-[0.3em] text-white/55 uppercase;
+  }
+}
+
+/* reveal on scroll */
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition:
+    opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0s);
+}
+.reveal-ready [data-reveal].in {
+  opacity: 1;
+  transform: none;
+}
+
+/* yacht viewer overlay */
+.grab {
+  cursor: grab;
+  touch-action: pan-y;
+}
+.grab:active {
+  cursor: grabbing;
+}
+.viewer-in {
+  animation: viewer-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes viewer-in {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pan-drift {
+  0%,
+  100% {
+    transform: translate3d(var(--p0), 0, 0);
+  }
+  50% {
+    transform: translate3d(var(--p1), 0, 0);
+  }
+}
+
+/* hero video section */
+.hero-video-section video {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal-ready [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}

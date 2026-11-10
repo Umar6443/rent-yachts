@@ -1,7 +1,5 @@
+import App from "@/components/App";
+
 export default function Home() {
-  return (
-    <main>
-      <h1>Dubriani Yachts</h1>
-    </main>
-  );
+  return <App />;
 }
