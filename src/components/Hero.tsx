@@ -122,21 +122,39 @@ function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => voi
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(canvas.clientWidth * dpr);
       canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       drawnFrame = -1;
     };
 
-    const draw = (idx: number) => {
-      const use = nearestLoaded(idx);
-      if (use < 0 || use === drawnFrame) return;
-      const img = images[use];
-      if (!img) return;
+    const drawCover = (img: HTMLImageElement) => {
       const cw = canvas.width;
       const ch = canvas.height;
       const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
       const dw = img.naturalWidth * s;
       const dh = img.naturalHeight * s;
       ctx.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
-      drawnFrame = use;
+    };
+
+    // draws the fractional frame f by crossfading the two adjacent frames,
+    // so scrubbing interpolates instead of stepping
+    const draw = (f: number) => {
+      const i0 = Math.max(0, Math.min(FRAMES - 1, Math.floor(f)));
+      const i1 = Math.min(FRAMES - 1, i0 + 1);
+      const frac = f - i0;
+      const base = loaded[i0] ? i0 : nearestLoaded(i0);
+      if (base < 0) return;
+      const blend = base === i0 && i1 !== i0 && loaded[i1] ? frac : 0;
+      const key = base + blend;
+      if (Math.abs(key - drawnFrame) < 0.003) return;
+      ctx.globalAlpha = 1;
+      drawCover(images[base]!);
+      if (blend > 0.01) {
+        ctx.globalAlpha = blend;
+        drawCover(images[i1]!);
+        ctx.globalAlpha = 1;
+      }
+      drawnFrame = key;
     };
 
     const overlays = (u: number) => {
@@ -176,10 +194,10 @@ function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => voi
     const loop = () => {
       raf = requestAnimationFrame(loop);
       if (document.hidden) return;
-      const k = reduced ? 1 : 0.24;
+      const k = reduced ? 1 : 0.18;
       currentFrame += (targetFrame - currentFrame) * k;
-      if (Math.abs(targetFrame - currentFrame) < 0.05) currentFrame = targetFrame;
-      draw(Math.round(currentFrame));
+      if (Math.abs(targetFrame - currentFrame) < 0.002) currentFrame = targetFrame;
+      draw(currentFrame);
     };
 
     const onResize = () => {

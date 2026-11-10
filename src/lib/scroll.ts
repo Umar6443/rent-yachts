@@ -6,7 +6,7 @@ const listeners = new Set<(y: number) => void>();
 
 export function initScroll(reduced: boolean) {
   if (lenis) return lenis;
-  lenis = new Lenis({ lerp: reduced ? 1 : 0.11, smoothWheel: !reduced, wheelMultiplier: 1, touchMultiplier: 1.4 });
+  lenis = new Lenis({ lerp: reduced ? 1 : 0.085, smoothWheel: !reduced, wheelMultiplier: 1, touchMultiplier: 1.4 });
   lenis.on("scroll", (l: Lenis) => listeners.forEach((fn) => fn(l.scroll)));
   const tick = (t: number) => {
     lenis?.raf(t);
