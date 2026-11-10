@@ -127,10 +127,8 @@ html.lenis body {
 }
 
 /* hero video section */
-.hero-video-section video {
-  object-fit: cover;
-  width: 100%;
-  height: 100%;
+.hero-video-section canvas {
+  display: block;
 }
 
 @media (prefers-reduced-motion: reduce) {

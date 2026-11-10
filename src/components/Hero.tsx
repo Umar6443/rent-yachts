@@ -6,16 +6,13 @@ import { BRAND, type YachtId } from "@/data/site";
 import { loadState } from "@/lib/loadstate";
 import { onScroll, scrollToTarget, startScroll } from "@/lib/scroll";
 
-const VIDEOS = [
-  "video/hero-01.mp4",
-  "video/hero-02.mp4",
-  "video/hero-03.mp4",
-  "video/hero-04.mp4",
-  "video/hero-05.mp4",
-  "video/hero-06.mp4",
-];
+const FRAMES = 202;
+const UNITS = 7;
+// the sticky viewport is pinned for UNITS - 1 viewport heights of scroll
+const SCRUB = UNITS - 1;
+const PRIORITY_STEP = 8;
 
-const TOTAL_UNITS = 6;
+const frameSrc = (i: number) => `seq/f-${String(i + 1).padStart(3, "0")}.webp`;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smooth = (a: number, b: number, x: number) => {
@@ -23,9 +20,18 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+// First ~88 frames are the slow aerial; give them 32% of the scroll so the
+// approach, orbit and interior entry play out over the remaining 68%.
+function frameAt(t: number) {
+  const ST = 0.32;
+  const SF = 88;
+  const f = t <= ST ? (t / ST) * SF : SF + ((t - ST) / (1 - ST)) * (FRAMES - 1 - SF);
+  return Math.min(FRAMES - 1, Math.max(0, f));
+}
+
 function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => void }) {
   const wrapRef = useRef<HTMLElement>(null);
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRefs = useRef<{
     brand: HTMLDivElement | null;
     headline: HTMLDivElement | null;
@@ -33,12 +39,30 @@ function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => voi
     cta: HTMLDivElement | null;
     arrow: HTMLDivElement | null;
   }>({ brand: null, headline: null, intro: null, cta: null, arrow: null });
-  const prevVideo = useRef(0);
 
   useEffect(() => {
-    let loaded = 0;
-    const total = VIDEOS.length;
+    const el = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (!el || !canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const images: (HTMLImageElement | null)[] = new Array(FRAMES).fill(null);
+    const loaded = new Array<boolean>(FRAMES).fill(false);
+
+    let vh = window.innerHeight;
+    let top = el.offsetTop;
+    let targetFrame = 0;
+    let currentFrame = -1;
+    let drawnFrame = -1;
+    let raf = 0;
+    let disposed = false;
     let started = false;
+
+    const priority: number[] = [];
+    for (let i = 0; i < FRAMES; i += PRIORITY_STEP) priority.push(i);
+    if (priority[priority.length - 1] !== FRAMES - 1) priority.push(FRAMES - 1);
 
     const kick = () => {
       if (started) return;
@@ -47,95 +71,134 @@ function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => voi
       startScroll();
     };
 
-    const onCanPlay = () => {
-      loaded++;
-      loadState.set({
-        progress: Math.round((loaded / total) * 90),
-        note: `Loading video ${loaded}/${total}`,
-      });
-      if (loaded >= 1) kick();
+    let priorityLoaded = 0;
+    const load = (i: number, onDone?: () => void) => {
+      if (images[i]) return;
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        loaded[i] = true;
+        drawnFrame = -1; // allow redraw with better frame
+        onDone?.();
+      };
+      img.onerror = () => onDone?.();
+      img.src = frameSrc(i);
+      images[i] = img;
     };
 
-    videoRefs.current.forEach((v) => {
-      if (!v) return;
-      if (v.readyState >= 3) onCanPlay();
-      else v.addEventListener("canplaythrough", onCanPlay, { once: true });
-    });
+    priority.forEach((i) =>
+      load(i, () => {
+        priorityLoaded++;
+        loadState.set({
+          progress: Math.round((priorityLoaded / priority.length) * 95),
+          note: "Preparing the voyage",
+        });
+        if (priorityLoaded >= priority.length) kick();
+      }),
+    );
 
-    const fallback = setTimeout(kick, 4000);
-    return () => clearTimeout(fallback);
-  }, []);
+    // fill remaining frames with a small worker pool
+    let fillIdx = 0;
+    const fillNext = () => {
+      if (disposed) return;
+      while (fillIdx < FRAMES && images[fillIdx]) fillIdx++;
+      if (fillIdx >= FRAMES) return;
+      load(fillIdx++, fillNext);
+    };
+    for (let w = 0; w < 6; w++) fillNext();
 
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
+    const fallback = setTimeout(kick, 4500);
 
-    let vh = window.innerHeight;
-    let top = el.offsetTop;
+    const nearestLoaded = (i: number) => {
+      if (loaded[i]) return i;
+      for (let d = 1; d < FRAMES; d++) {
+        if (i - d >= 0 && loaded[i - d]) return i - d;
+        if (i + d < FRAMES && loaded[i + d]) return i + d;
+      }
+      return -1;
+    };
+
+    const sizeCanvas = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      drawnFrame = -1;
+    };
+
+    const draw = (idx: number) => {
+      const use = nearestLoaded(idx);
+      if (use < 0 || use === drawnFrame) return;
+      const img = images[use];
+      if (!img) return;
+      const cw = canvas.width;
+      const ch = canvas.height;
+      const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+      const dw = img.naturalWidth * s;
+      const dh = img.naturalHeight * s;
+      ctx.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+      drawnFrame = use;
+    };
+
+    const overlays = (u: number) => {
+      const { brand, headline, intro, cta, arrow } = overlayRefs.current;
+      if (brand) {
+        const o = 1 - smooth(0.45, 1.0, u);
+        brand.style.opacity = String(o);
+        brand.style.transform = `translate3d(0,${(1 - o) * -24}px,0)`;
+      }
+      if (arrow) arrow.style.opacity = String(1 - smooth(0.3, 0.65, u));
+      if (headline) {
+        const fi = smooth(1.0, 1.6, u);
+        const fo = 1 - smooth(2.5, 3.0, u);
+        headline.style.opacity = String(Math.min(fi, fo));
+        headline.style.transform = `translate3d(0,${(1 - fi) * 30}px,0)`;
+      }
+      if (intro) {
+        const fi = smooth(3.2, 3.7, u);
+        const fo = 1 - smooth(4.4, 4.9, u);
+        intro.style.opacity = String(Math.min(fi, fo));
+        intro.style.transform = `translate3d(0,${(1 - fi) * 30}px,0)`;
+      }
+      if (cta) {
+        const o = smooth(5.3, 5.7, u);
+        cta.style.opacity = String(o);
+        cta.style.pointerEvents = o > 0.5 ? "auto" : "none";
+        cta.style.transform = `translate3d(0,${(1 - o) * 24}px,0)`;
+      }
+    };
+
+    const onScrollPx = (scrollPx: number) => {
+      const u = Math.max(0, Math.min(SCRUB, (scrollPx - top) / vh));
+      targetFrame = frameAt(u / SCRUB);
+      overlays(u);
+    };
+
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      if (document.hidden) return;
+      const k = reduced ? 1 : 0.24;
+      currentFrame += (targetFrame - currentFrame) * k;
+      if (Math.abs(targetFrame - currentFrame) < 0.05) currentFrame = targetFrame;
+      draw(Math.round(currentFrame));
+    };
 
     const onResize = () => {
       vh = window.innerHeight;
       top = el.offsetTop;
+      sizeCanvas();
     };
     window.addEventListener("resize", onResize);
 
-    const render = (scrollPx: number) => {
-      const progress = (scrollPx - top) / vh;
-      const u = Math.max(0, Math.min(TOTAL_UNITS, progress));
-
-      const activeIdx = Math.min(VIDEOS.length - 1, Math.floor(u));
-      if (activeIdx !== prevVideo.current) {
-        videoRefs.current.forEach((v, i) => {
-          if (!v) return;
-          if (i === activeIdx) {
-            v.style.opacity = "1";
-            v.play().catch(() => {});
-          } else {
-            v.style.opacity = "0";
-          }
-        });
-        prevVideo.current = activeIdx;
-      }
-
-      const { brand, headline, intro, cta, arrow } = overlayRefs.current;
-
-      if (brand) {
-        const opacity = 1 - smooth(0.6, 1.2, u);
-        brand.style.opacity = String(opacity);
-        brand.style.transform = `translate3d(0,${(1 - opacity) * -20}px,0)`;
-      }
-
-      if (arrow) {
-        arrow.style.opacity = String(1 - smooth(0.4, 0.8, u));
-      }
-
-      if (headline) {
-        const fadeIn = smooth(0.8, 1.4, u);
-        const fadeOut = 1 - smooth(3.0, 3.6, u);
-        const opacity = Math.min(fadeIn, fadeOut);
-        headline.style.opacity = String(opacity);
-        headline.style.transform = `translate3d(0,${(1 - fadeIn) * 28}px,0)`;
-      }
-
-      if (intro) {
-        const fadeIn = smooth(3.2, 3.8, u);
-        const fadeOut = 1 - smooth(4.8, 5.2, u);
-        const opacity = Math.min(fadeIn, fadeOut);
-        intro.style.opacity = String(opacity);
-        intro.style.transform = `translate3d(0,${(1 - fadeIn) * 28}px,0)`;
-      }
-
-      if (cta) {
-        const opacity = smooth(5.0, 5.4, u);
-        cta.style.opacity = String(opacity);
-        cta.style.transform = `translate3d(0,${(1 - opacity) * 20}px,0)`;
-      }
-    };
-
-    render(0);
-    const unsub = onScroll(render);
+    sizeCanvas();
+    currentFrame = 0;
+    onScrollPx(window.scrollY || 0);
+    const unsub = onScroll(onScrollPx);
+    raf = requestAnimationFrame(loop);
 
     return () => {
+      disposed = true;
+      clearTimeout(fallback);
+      cancelAnimationFrame(raf);
       unsub();
       window.removeEventListener("resize", onResize);
     };
@@ -145,41 +208,29 @@ function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => voi
     <section
       ref={wrapRef}
       className="hero-video-section relative"
-      style={{ height: `${TOTAL_UNITS * 100}svh` }}
+      style={{ height: `${UNITS * 100}svh` }}
     >
-      <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
-        {/* video layers */}
-        {VIDEOS.map((src, i) => (
-          <video
-            key={src}
-            ref={(el) => {
-              videoRefs.current[i] = el;
-            }}
-            src={src}
-            autoPlay={i === 0}
-            muted
-            loop
-            playsInline
-            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-            style={{ opacity: i === 0 ? 1 : 0 }}
-          />
-        ))}
+      <div className="sticky top-0 h-[100svh] w-full overflow-hidden bg-[var(--bg)]">
+        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden />
 
         {/* dark overlay for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/30 to-[#0a0a0f]/20" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-transparent to-[#0a0a0f]/25" />
 
         {/* brand name overlay — visible at top */}
         <div
           ref={(el) => {
             overlayRefs.current.brand = el;
           }}
-          className="absolute inset-0 flex flex-col items-center justify-center text-center"
+          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center"
         >
           <p className="font-serif text-[14vw] leading-[0.88] tracking-[0.06em] text-[var(--accent)] sm:text-[10vw] md:text-[8vw]">
             {BRAND.name}
           </p>
           <p className="mt-4 font-mono text-[10px] tracking-[0.45em] text-white/60 sm:text-[11px]">
             {BRAND.tag.toUpperCase()}
+          </p>
+          <p className="mt-10 font-mono text-[10px] tracking-[0.3em] text-white/40">
+            SCROLL TO BEGIN THE VOYAGE
           </p>
         </div>
 
@@ -199,40 +250,40 @@ function Hero({ onOpenYacht: _onOpenYacht }: { onOpenYacht: (id: YachtId) => voi
           </button>
         </div>
 
-        {/* headline overlay — fades in during scroll */}
+        {/* headline overlay — during the descent */}
         <div
           ref={(el) => {
             overlayRefs.current.headline = el;
           }}
-          className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-0"
+          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center opacity-0"
         >
-          <h1 className="font-serif text-[14vw] leading-[0.92] tracking-[-0.02em] sm:text-[9vw] md:text-[7vw]">
+          <h1 className="font-serif text-[14vw] leading-[0.92] tracking-[-0.02em] [text-shadow:0_2px_24px_rgba(0,0,0,0.55)] sm:text-[9vw] md:text-[7vw]">
             {BRAND.headline[0]}
             <br />
             <em className="italic text-[var(--accent)]">{BRAND.headline[1]}</em>
           </h1>
         </div>
 
-        {/* intro text overlay */}
+        {/* intro text overlay — alongside the hull */}
         <div
           ref={(el) => {
             overlayRefs.current.intro = el;
           }}
-          className="absolute inset-0 flex items-center justify-center px-6 text-center opacity-0"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center opacity-0"
         >
-          <p className="max-w-2xl font-serif text-xl leading-relaxed text-white/90 sm:text-2xl md:text-3xl">
+          <p className="max-w-2xl rounded-2xl bg-black/25 px-7 py-6 font-serif text-xl leading-relaxed text-white backdrop-blur-[3px] [text-shadow:0_1px_10px_rgba(0,0,0,0.8)] sm:text-2xl md:text-3xl">
             {BRAND.intro}
           </p>
         </div>
 
-        {/* CTA overlay */}
+        {/* CTA overlay — inside the salon */}
         <div
           ref={(el) => {
             overlayRefs.current.cta = el;
           }}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-6 text-center opacity-0"
+          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-6 text-center opacity-0"
         >
-          <p className="font-mono text-[10px] tracking-[0.4em] text-[var(--accent)]">
+          <p className="font-mono text-[10px] tracking-[0.4em] text-[var(--accent)] drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
             FOUR YACHTS &middot; DUBAI MARINA
           </p>
           <button onClick={() => scrollToTarget("#fleet")} className="btn">
